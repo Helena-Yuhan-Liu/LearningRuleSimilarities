@@ -1,0 +1,5 @@
+setup.py
+multisys_pipeline.egg-info/PKG-INFO
+multisys_pipeline.egg-info/SOURCES.txt
+multisys_pipeline.egg-info/dependency_links.txt
+multisys_pipeline.egg-info/top_level.txt

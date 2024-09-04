@@ -1,0 +1,5 @@
+-e libs/netrep-main
+-e libs/pyrcca-main
+-e libs/DSA
+-e libs/dPCA-master/python
+-e .
