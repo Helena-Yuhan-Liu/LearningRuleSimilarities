@@ -6,11 +6,11 @@ Please be advised that the included code supports the training and analysis pipe
 
 ## Usage 
 
-Step 1 - Setup:
+**Step 1** - Setup:
    Run the command `python3 setup.py`.
    Refer to the comments in setup.py for troubleshooting if any issues occur.
 
-Step 2 - Train a Model:
+**Step 2** - Train a Model:
    Execute `python3 multisys_pipeline/main_train_model.py`.
    You can modify the command line arguments to specify hyperparameters and select the learning rule (e.g., `learning_mode=0` for BPTT and `learning_mode=1` for e-prop).
 
@@ -24,13 +24,13 @@ Step 2 - Train a Model:
 
    `python3 multisys_pipeline/main_train_model.py --learning_mode=1 --random_seed=2`
 
-Step 3 - Run Analysis:
+**Step 3** - Run Analysis:
    Execute `python3 multisys_pipeline/main_analyze_models.py`.
-   Modify the block of code below line 72 to specify which models to include in the analysis.
+   Modify the block of code below `line 72` to specify which models to include in the analysis.
 
 ## Credits 
 
-YHL and CJC both contributed to the code development. We thank Nathan Cloos and Katheryn Zhou for their preprocessing code for the Mante 2013 dataset, which builds on Valerio Mante’s original scripts. We are also grateful to Mante, Hatsopoulos, and Churchland for sharing their neural datasets. 
+Helena Liu and Chris Cueva both contributed to the code development. We thank Nathan Cloos and Katheryn Zhou for their preprocessing code for the Mante 2013 dataset, which builds on Valerio Mante’s original scripts. We are also grateful to Mante, Hatsopoulos, and Churchland for sharing their neural datasets. 
 
 ## Reference 
 
