@@ -6,8 +6,6 @@ os.chdir(root_dir)# print(f'current working direction is {os.getcwd()}')
 import numpy as np# https://stackoverflow.com/questions/11788950/importing-numpy-into-functions
 import torch
 import matplotlib
-if 'allen' in os.getcwd():
-    matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import pickle
@@ -19,9 +17,10 @@ import pickle
 from multisys_pipeline.models.model_architectures import CTRNN, effective_weight, get_Wab # relative import, from file import function
 # from multisys_pipeline.models.model_architectures import LowPassCTRNN 
 from multisys_pipeline.utils.compute_normalized_error import compute_normalized_error
-#from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015_EMG import generateINandTARGETOUT_Sussillo2015_EMG
+# from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015_EMG import generateINandTARGETOUT_Sussillo2015_EMG
+from multisys_pipeline.models.generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue import generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue
 #---
-# from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015_planinputextendedscaledup_holdcue import generateINandTARGETOUT_Sussillo2015_planinputextendedscaledup_holdcue
+from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015_planinputextendedscaledup_holdcue import generateINandTARGETOUT_Sussillo2015_planinputextendedscaledup_holdcue
 from torch.optim.lr_scheduler import StepLR
 #---
 #import sys; sys.exit()# stop script at current line
@@ -35,30 +34,32 @@ from torch.optim.lr_scheduler import StepLR
 # https://tacc.github.io/ctls2017/docs/intro_to_python/intro_to_python_101_argparse.html
 from argparse import ArgumentParser
 parser = ArgumentParser()# if type is not specified then by default the parser reads command-line arguments in as simple strings
-parser.add_argument('--task_name', default='Mante13', choices=['Mante13'], type=str)# task_name determines which version of generateINandTARGETOUT is used, task_name is also used to name the folder where parameters are stored
+parser.add_argument('--task_name', default='Mante13', choices=['Mante13', 'Hatsopoulos2007_sincosbumpinput_holdcue'], type=str)# task_name determines which version of generateINandTARGETOUT is used, task_name is also used to name the folder where parameters are stored
 parser.add_argument('--optimizer_name', default='Adam', choices=['Adam', 'AdamW'], help="Options: 'Adam', 'AdamW'", type=str)# optimizer_name determines which optimizer to use when updating the model parameters
-parser.add_argument('--learning_rate', default=1e-3, help='learning rate for Adam optimizer', type=float)# learning_rate = 1e-3 default
+parser.add_argument('--learning_rate', default=3e-4, help='learning rate for Adam optimizer', type=float)# learning_rate = 1e-3 default
 parser.add_argument('--CLIP_GRADIENT_NORM', default=0, help='if CLIP_GRADIENT_NORM = 1 then clip the norm of the gradient', type=int)
 parser.add_argument('--max_gradient_norm', default=0.4, help='if CLIP_GRADIENT_NORM = 1 then the norm of the gradient is clipped to have a maximum value of max_gradient_norm', type=float)# this is only used if CLIP_GRADIENT_NORM = 1
-parser.add_argument('--n_parameter_updates', default=3000, help='number of parameter updates', type=int)# set required=True for arguments that are required
+parser.add_argument('--n_parameter_updates', default=1000, help='number of parameter updates', type=int)# set required=True for arguments that are required
 parser.add_argument('--model_class', default='CTRNN', help='RNN model architecture', type=str)# 'CTRNN', 'LowPassCTRNN'
 parser.add_argument('--activation_function', default='retanh', help='RNN activation function', type=str)# set required=True for arguments that are required
-parser.add_argument('--n_recurrent', default=400, help='number of units in RNN', type=int)# set required=True for arguments that are required
-parser.add_argument('--regularization_activityL2', default=0.0, help='L2 regularization on h - "firing rate" of units, larger regularization_activityL2 = more regularization = smaller absolute firing rates', type=float)# set required=True for arguments that are required
+parser.add_argument('--n_recurrent', default=200, help='number of units in RNN', type=int)# set required=True for arguments that are required
+parser.add_argument('--regularization_activityL2', default=10.0, help='L2 regularization on h - "firing rate" of units, larger regularization_activityL2 = more regularization = smaller absolute firing rates', type=float)# set required=True for arguments that are required
 parser.add_argument('--L2_Wrec', default=0.0, help='L2 regularization on off block diagonal Wrec', type=float)
-parser.add_argument('--activity_noise_std', default=0.1, help='added noise', type=float)# use 0.0 instead of 0 so folder names are consistent when using nonzero noise, e.g. activity_noise_std = 0.1
+parser.add_argument('--activity_noise_std', default=0.0, help='added noise', type=float)# use 0.0 instead of 0 so folder names are consistent when using nonzero noise, e.g. activity_noise_std = 0.1
 parser.add_argument('--ini_gain', default=1.0, help='initial weight gain', type=float)
 parser.add_argument('--tau_m', default=10.0, help='membrane time constant', type=float)
 parser.add_argument('--conn_density', default=-1, help='sparsity of connection, -1 to turn off', type=float)
-parser.add_argument('--learning_mode', default=1, help='learning rule mode; 0: BPTT, 1:e-prop, 2:ModProp, -1:TBPTT', type=int)
+parser.add_argument('--learning_mode', default=1, help='learning rule mode; 0: BPTT, 1:e-prop', type=int)
 parser.add_argument('--dale_constraint', default=False, help='constrain with Dale or not', type=bool)
 parser.add_argument('--random_seed', default=1, help='random seed', type=int)# set required=True for arguments that are required
 #-----------------------------------------------------------------------------
-# the following arguments are used if task_name is 'Sussillo2015'
-parser.add_argument('--toffsetoutput', default=10, help="toffsetoutput is only used if task_name is 'Hatsopoulos2007' or 'Sussillo2015'. Number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial", type=int)# set required=True for arguments that are required
+# Used for Hats07
+parser.add_argument('--toffsetoutput', default=-10, help="toffsetoutput is only used if task_name is 'Hatsopoulos2007' or 'Sussillo2015'. Number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial", type=int)# set required=True for arguments that are required
 parser.add_argument('--OUTPUTONEHOT', default=0, type=int)# set required=True for arguments that are required
 parser.add_argument('--OUTPUTEMG', default=1, type=int)# set required=True for arguments that are required
 parser.add_argument('--folder_comment', default='', help="sub folder to load store data", type=str)
+# the following arguments are only used if task_name starts with 'Hatsopoulos2007' 
+parser.add_argument('--OUTPUTSHOULDERELBOWANGLES', default=1, type=int)# set required=True for arguments that are required
 #-----------------------------------------------------------------------------
 args = vars(parser.parse_args())# args is a dictionary with keys args.keys()
 # example: task_name = args["task_name"]
@@ -72,17 +73,15 @@ set_seed = True
 if set_seed:
     np.random.seed(args["random_seed"]); torch.manual_seed(args["random_seed"])# set random seed for reproducible results 
 
-assert learning_mode < 3 or (activity_noise_std == 0.0), \
-        "If learning_mode > 3, then recurrent noise is not supported"
-
 ##############################################################################
 #%% initialize network
 task_name = args["task_name"]# task_name determines which version of generateINandTARGETOUT is used, task_name is also used to name the folder where parameters are stored
 if task_name == 'Sussillo2015_planinputextendedscaledup_holdcue':
     short_task_name = 'Sussillo2015'
+elif task_name == 'Hatsopoulos2007_sincosbumpinput_holdcue': 
+    short_task_name = task_name[0:15]
 else:
     short_task_name = task_name
-
 
 if task_name[0:12]=='Sussillo2015':# this assumes task_name starts with the phrase Sussillo2015
     #-----
@@ -114,8 +113,46 @@ if task_name[0:12]=='Sussillo2015':# this assumes task_name starts with the phra
     folder_suffix = folder_suffix + f'_toffsetoutput{toffsetoutput}'
     task_input_dict = {'n_input':n_input, 'n_output':n_output, 'n_T':n_T, 'n_trials':n_trials, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
 
+elif task_name[0:15]=='Hatsopoulos2007':# this assumes task_name starts with the phrase Hatsopoulos2007
+    #-----
+    assert (toffsetoutput==-10) and (regularization_activityL2==10.) and (activity_noise_std==0.), "check args setting for Hatsopoulos2007"
+    if task_name=='Hatsopoulos2007_sincosbumpinput_holdcue': 
+        generateINandTARGETOUT = generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue
+        n_input = 3# 2 inputs (sine(orientation) and cosine(orientation)) encode the reach condition + 1 input for the hold-cue
+        interval1set = np.arange(0,50)# interval before input specifying the condition, if interval1 is 0 then tstartcondition is at the very beginning of the trial (index 0)
+        interval2set = np.arange(0,150)# interval after the input specifying the condition and before the hold-cue turns off
+    #-----   
+    n_T = 250
+    n_T = 300# numer of timesteps in trial. increase n_T so target outputs are not truncated when interval1 and interval2 are large
+    n_trials = 100
+    toffsetoutput = args["toffsetoutput"]
+    # toffsetoutput = -10 for OUTPUTONEHOT
+    # toffsetoutput = -10 for OUTPUTXYHANDPOSITION
+    # toffsetoutput = +5 for OUTPUTXYHANDVELOCITY
+    # toffsetoutput = -10 for OUTPUTSHOULDERELBOWANGLES
+    
+    # OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1
+    # in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+    OUTPUTONEHOT = args["OUTPUTONEHOT"]# 0 or 1
+    OUTPUTXYHANDPOSITION = 0# args["OUTPUTXYHANDPOSITION"]# 0 or 1
+    OUTPUTXYHANDVELOCITY = 0# args["OUTPUTXYHANDVELOCITY"]# 0 or 1
+    OUTPUTSHOULDERELBOWANGLES = args["OUTPUTSHOULDERELBOWANGLES"]# 0 or 1
+    n_output = 0
+    if OUTPUTONEHOT: n_output = n_output+ 8# one-hot output for each reach condition
+    if OUTPUTXYHANDPOSITION: n_output = n_output + 2
+    if OUTPUTXYHANDVELOCITY: n_output = n_output + 2
+    if OUTPUTSHOULDERELBOWANGLES: n_output = n_output + 2# output shoulder and elbow angle
+    
+    folder_suffix = ''
+    # if OUTPUTONEHOT: folder_suffix = folder_suffix + '_outputonehot'
+    # if OUTPUTXYHANDPOSITION: folder_suffix = folder_suffix + '_outputxyhandposition'
+    # if OUTPUTXYHANDVELOCITY: folder_suffix = folder_suffix + '_outputxyhandvelocity'
+    # if OUTPUTSHOULDERELBOWANGLES: folder_suffix = folder_suffix + '_outputshoulderelbowangles'
+    # folder_suffix = folder_suffix + f'_toffsetoutput{toffsetoutput}'
+    task_input_dict = {'n_input':n_input, 'n_output':n_output, 'n_T':n_T, 'n_trials':n_trials, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
+
 elif task_name == 'Mante13':
-    Mante13_path = root_dir + 'Mante13_data/' + folder_comment
+    Mante13_path = root_dir + 'experimental_data/Mante13_data/' + folder_comment
     neuralforRNN = np.load(Mante13_path + 'neuralforRNN.npy') # generated from Katheryn's code 
     with open(Mante13_path + 'data_synthetic.pkl', 'rb') as f:
         data_synthetic = pickle.load(f)
@@ -128,6 +165,8 @@ elif task_name == 'Mante13':
     folder_suffix = ''
     task_input_dict = {'n_input':n_input, 'n_output':n_output, 'n_T':n_T, 'n_trials':n_trials}
 
+# assert activation_function=='retanh', "Retanh worked better for this task." 
+# assert not dale_constraint, "Turning off Dale's constraints worked better." 
    
 n_recurrent = args["n_recurrent"]# (200)
 #-------------------------------------------  
@@ -227,7 +266,14 @@ if task_name[0:12]=='Sussillo2015':# this assumes task_name starts with the phra
     model_info_dictionary['OUTPUTXYHANDPOSITION'] = OUTPUTXYHANDPOSITION# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
     model_info_dictionary['OUTPUTXYHANDVELOCITY'] = OUTPUTXYHANDVELOCITY# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
     model_info_dictionary['OUTPUTEMG'] = OUTPUTEMG# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
-   
+elif task_name[0:15]=='Hatsopoulos2007':# this assumes task_name starts with the phrase Hatsopoulos2007
+    model_info_dictionary['toffsetoutput'] = toffsetoutput
+    # OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1
+    # in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+    model_info_dictionary['OUTPUTONEHOT'] = OUTPUTONEHOT
+    model_info_dictionary['OUTPUTXYHANDPOSITION'] = OUTPUTXYHANDPOSITION
+    model_info_dictionary['OUTPUTXYHANDVELOCITY'] = OUTPUTXYHANDVELOCITY
+    model_info_dictionary['OUTPUTSHOULDERELBOWANGLES'] = OUTPUTSHOULDERELBOWANGLES
 
 np.save(f'{figure_dir}/model_info_dictionary.npy', model_info_dictionary)
 #model_info_dictionary = np.load(f'{figure_dir}/model_info_dictionary.npy', allow_pickle='TRUE').item()
@@ -327,12 +373,12 @@ figure_suffix = ''
 #pcounter = 0
 for p in range(n_parameter_updates+1):# 0, 1, 2, ... n_parameter_updates
     activity_noise = activity_noise_std*torch.randn(n_trials, n_T, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
-    if task_name[0:12]=='Sussillo2015':
+    if (task_name[0:12]=='Sussillo2015') or (task_name[0:15]=='Hatsopoulos2007'):
         IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
     
     model_output_forwardpass = model({'input':IN, 'activity_noise':activity_noise, 'conn_density':conn_density})# model_input_forwardpass = {'input':IN, 'activity_noise':activity_noise}
     output = model_output_forwardpass['output']; activity = model_output_forwardpass['activity']# (n_trials, n_T, n_output/n_recurrent)
-    if task_name[0:12]=='Sussillo2015':
+    if (task_name[0:12]=='Sussillo2015') or (task_name[0:15]=='Hatsopoulos2007'):
         errormain = torch.sum((output[output_mask==1] - TARGETOUT[output_mask==1])**2) / torch.sum(output_mask==1)# output_mask: n_trials x n_T x n_output tensor, elements 0(timepoint does not contribute to this term in the error function), 1(timepoint contributes to this term in the error function) 
     elif task_name == 'Mante13':
         # Reshape or transpose output to match the expected shape for cross_entropy: (batch*time, num_classes)

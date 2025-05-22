@@ -18,9 +18,6 @@ import pickle
 
 random_seed = 1234; np.random.seed(random_seed); torch.manual_seed(random_seed)# set random seed for reproducible results 
 
-if 'allen' in os.getcwd():
-    matplotlib.use('Agg') 
-
 # for heatmap plots
 #from matplotlib import colors
 #import colorcet as cc# perceptually uniform colour maps https://colorcet.holoviz.org/user_guide/, redwhiteblue = cm.get_cmap('cet_CET_D1', n_curves)  or cmap=cc.cm.CET_D1 
@@ -28,7 +25,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 
-# from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015 import generateINandTARGETOUT_Sussillo2015
+from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015 import generateINandTARGETOUT_Sussillo2015
+from multisys_pipeline.models.generateINandTARGETOUT_Hatsopoulos2007 import generateINandTARGETOUT_Hatsopoulos2007
 
 
 from multisys_pipeline.utils.computedistance_normalizedwithdata import computedistance_normalizedwithdata
@@ -53,7 +51,7 @@ from multisys_pipeline.utils.computeDPCA import computeDPCA# from file import fu
 
 import argparse
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--dataset_name', default='Mante13', type=str, help='Mante13')
+parser.add_argument('--dataset_name', default='Mante13', choices=['Mante13', 'Hatsopoulos2007'], type=str)
 parser.add_argument('--anal_mode', default='compLM', type=str, help='compLR = compare different learning rates')
 parser.add_argument('--load_stored_dist', default=False, type=bool, help='load stored distance if it exists')
 args = parser.parse_args()
@@ -73,15 +71,24 @@ dataset_name = args.dataset_name
 #                       pick models to analyze
 ##############################################################################
 
-n_models = 4
-data_dir0 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.1_rng1_lm0_lr0.001_l20.0_g01.0'
-legend_label0 = 'BPTT'; color0='k'
-data_dir1 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.1_rng2_lm0_lr0.001_l20.0_g01.0'
-legend_label1 = 'BPTT'; color1='k'
-data_dir2 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.1_rng1_lm1_lr0.001_l20.0_g01.0'
-legend_label2 = 'magenta'; color2='m'
-data_dir3 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.1_rng2_lm1_lr0.001_l20.0_g01.0'
-legend_label3 = 'magenta'; color3='m'
+if dataset_name == 'Mante13': 
+    n_models = 2
+    data_dir0 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent200_activitynoisestd0.0_rng1_lm0_lr0.0003_l210.0_g01.0'
+    legend_label0 = 'BPTT'; color0='k'
+    data_dir1 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent200_activitynoisestd0.0_rng1_lm1_lr0.0003_l210.0_g01.0'
+    legend_label1 = 'E-prop'; color1='m'
+    # # The paper used N=400 for the Mante13 task 
+    # n_models = 2
+    # data_dir0 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.0_rng1_lm0_lr0.0003_l210.0_g01.0'
+    # legend_label0 = 'BPTT'; color0='k'
+    # data_dir1 = root_dir + 'store_trained_models/Mante13_retanh_nrecurrent400_activitynoisestd0.0_rng1_lm1_lr0.0003_l210.0_g01.0'
+    # legend_label1 = 'E-prop'; color1='m'
+elif dataset_name == 'Hatsopoulos2007': 
+    n_models = 2
+    data_dir0 = root_dir + 'store_trained_models/Hatsopoulos2007_retanh_nrecurrent200_activitynoisestd0.0_rng1_lm0_lr0.001_l210.0_g01.0'
+    legend_label0 = 'BPTT'; color0='k'
+    data_dir1 = root_dir + 'store_trained_models/Hatsopoulos2007_retanh_nrecurrent200_activitynoisestd0.0_rng1_lm1_lr0.0003_l210.0_g01.0'
+    legend_label1 = 'E-prop'; color1='m'
 folder_suffix = '' # can be anything you want, for the purpose of naming stored analysis folders  
 
 
@@ -206,8 +213,59 @@ if dataset_name == 'Sussillo2015':# load neural data and pick timepoints to anal
     colormapforconditions = colorsredgreen
     #import sys; sys.exit()# stop script at current line
     
+### 
+elif dataset_name == 'Hatsopoulos2007':# load neural data and pick timepoints to analyze in neural data and RNN models
+    generateINandTARGETOUT = generateINandTARGETOUT_Hatsopoulos2007
+    # load neural data
+    #--------------------------------------------------------------------------
+    # To process the kinematic data we use the variables tstart, tend, and n_T_downsample
+    # To process the firing rates we use the variables tstart, tend, tpad, SD, T_downsample, dt_downsample
+    # The smoothed firing rates are downsampled by averaging across a sliding window of size dt_downsample centered around times in T_downsample
+    #--------------------------------------------------------------------------
+    #tstart = -500# keep times [tstart:dt_downsample:tend] ms relative to start of movement 
+    #tend = 500# keep times [tstart:dt_downsample:tend] ms relative to start of movement 
+    tstart = -800# keep times [tstart:dt_downsample:tend] ms relative to start of movement 
+    tend = 400# keep times [tstart:dt_downsample:tend] ms relative to start of movement 
+    dt_downsample = 10# each timestep of the downsampled firing rate is dt_downsample ms apart
+    T_downsample = np.arange(tstart, tend+dt_downsample, step=dt_downsample)
+    n_T_downsample = T_downsample.size
+    SD = 25# standard deviation of Gaussian filter in ms applied to neural activity, this is not used on the kinematic data
+    tpad = 100# Compute firing rates for tpad=100 ms before and after our interval of interest [tstart, tend] and then truncate to the desired interval. This way the firing rates near the ends of our interval are more accurate.
+    
+    #data_dir_processed = '/Users/christophercueva/Desktop/neural networks/zzz - data Hatsopoulos/'# load processed data from data_dir_processed
+    if os.path.exists(f'{root_dir}/experimental_data/Hatsopoulos2007/data_output_aligntomovementonset_minT{tstart}_maxT{tend}_FRsmoothSD{SD}ms.npy'):
+        data_output_dict = np.load(f'{root_dir}/experimental_data/Hatsopoulos2007/data_output_aligntomovementonset_minT{tstart}_maxT{tend}_FRsmoothSD{SD}ms.npy', allow_pickle='TRUE').item()#np.save(f'{figure_dir}/data_output_aligntomovementonset_minT{tstart}_maxT{tend}_FRsmoothSD{SD}ms.npy', data_output)
+    else:
+        data_dir_matfiles = '/Users/christophercueva/Desktop/neural networks/zzz - data Hatsopoulos/doi_10.5061_dryad.xsj3tx9cm__v2/'# load original Hatsopoulos2007 data from data_dir_matfiles
+        data_input_dict = {'tstart':tstart, 'tend':tend, 'T_downsample':T_downsample, 'SD':SD, 'tpad':tpad, 'data_dir_matfiles':data_dir_matfiles, 'data_dir_processed':data_dir_processed}# dictionary
+        data_output_dict = load_data_Hatsopoulos2007(data_input_dict)
+    neuralforRNN = data_output_dict['firing_rate']# n_neurons(141) x n_Tneural(121) x n_conditions(8) array, time [-800:10:400] ms relative to movement onset
+    [n_neurons, n_Tneural, n_conditions] = neuralforRNN.shape
+    Elabelneural = 'movement onset'# itimekeep_neural are relative to Elabelneural (ms)
+    Tneural = T_downsample
+    itimekeep_neural = (np.ones(n_Tneural)==1)# array of True
+    n_Tkeep = n_Tneural# 101
+    distance_info_dictionary['itimekeep_neural'] = itimekeep_neural
+    distance_info_dictionary['n_Tkeep'] = n_Tkeep
+    #---------------
+    ElabelRNN = 'movement onset'# itimekeep_RNN are relative to ElabelRNN (ms)
+    interval1set = np.array([25])# use A=np.array([x]) not A=np.array(x) so A[0] is defined. interval before input specifying the reach condition, if interval1 is 0 then tstartcondition is at the very beginning of the trial (index 0)
+    interval2set = np.array([105])# use A=np.array([x]) not A=np.array(x) so A[0] is defined. interval after the input specifying the reach condition and before the hold-cue turns off
+    
+    n_T_test = 250
+    T = np.arange(n_T_test)
+    itimekeep_RNN = np.logical_and(-800<=10*(T-185), 10*(T-185)<=400)
+    n_trials_test = n_conditions# there are 8 different reach conditions
+    #---------------
+    # create red-to-green colormap for experimental conditions
+    n_colors = n_conditions
+    colorsredgreen = np.stack((np.linspace(0.9,0,n_colors), np.linspace(0,0.9,n_colors), np.zeros(n_colors), np.ones(n_colors)), axis=-1)# (n_colors, 4) array columns 1,2,3 are the RGB values, column 4 sets the transparency/alpha, datapoint[0] has color colormap[0,:]      
+    colormapforconditions = colorsredgreen
+
+    
+### 
 elif dataset_name == 'Mante13':
-    Mante13_path = root_dir + 'Mante13_data/' 
+    Mante13_path = root_dir + 'experimental_data/Mante13_data/' 
     neuralforRNN = np.load(Mante13_path + 'neuralforRNN.npy') # generated from Katheryn's code 
     with open(Mante13_path + 'data_synthetic.pkl', 'rb') as f:
         data_synthetic = pickle.load(f)
@@ -297,7 +355,7 @@ ax.set_ylim([0.0, 1.0])
 ax.set_xlim(xmin=0, xmax=None); ax.set_ylim(ymin=0, ymax=None)
 ax.tick_params(axis='both', labelsize=fontsize)
 ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False);# ax.spines['bottom'].set_visible(False); ax.spines['left'].set_visible(False)
-fig.savefig('%s/errornormalized_vs_numberofparameterupdates_loadfromtrainingfolders%s.pdf'%(figure_dir,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
+fig.savefig('%s/errornormalized_vs_numupdates%s.pdf'%(figure_dir,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
 #import sys; sys.exit()# stop script at current line
 
 
@@ -459,6 +517,10 @@ else:
             toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
             OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
             task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG} 
+        if task_name_model[0:15]=='Hatsopoulos2007':# this assumes task_name_model starts with the phrase Hatsopoulos2007
+            toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps output is offset, no change if toffsetoutput=0, if toffsetoutput is negative then target outuput is earlier in the trial
+            OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTSHOULDERELBOWANGLES=model_info_dictionary['OUTPUTSHOULDERELBOWANGLES']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+            task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
         #--------------------------
         activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
         #--------------------------
@@ -544,71 +606,6 @@ else:
         np.save(f'{figure_dir}/distance_test_store.npy', distance_test_store)
         np.save(f'{figure_dir}/distance_train_cross_condition_average_baseline_store.npy', distance_train_cross_condition_average_baseline_store)
         np.save(f'{figure_dir}/distance_test_cross_condition_average_baseline_store.npy', distance_test_cross_condition_average_baseline_store)
-    
-
-       
-#%%############################################################################
-#       plot activity over training         
-##############################################################################   
-    
-# # the following 7 lines assume that pset is the same for all models, in other words, the parameters are saved at the same points for all models
-# data_dir = eval(f"data_dir{0}")# use eval so data_dir is the value of data_dir0 and not the string 'data_dir0'
-# pset_saveparameters = np.load(f'{data_dir}/pset_saveparameters.npy')
-
-# for imodel in [11]: # the model index to plot # range(n_models):   
-#     data_dir = eval(f"data_dir{imodel}")# use eval so data_dir is the value of data_dir0 and not the string 'data_dir0'
-#     model = torch.load(f'{data_dir}/model.pth')# torch.save(model, f'{figure_dir}/model.pth')# save entire model, not just model parameters
-#     # This save/load process uses the most intuitive syntax and involves the least amount of code. 
-#     # Saving a model in this way will save the entire module using Python’s pickle module. 
-#     # The disadvantage of this approach is that the serialized data is bound to the specific classes and the exact directory structure used when the model is saved. The reason for this is because pickle does not save the model class itself. Rather, it saves a path to the file containing the class, which is used during load time. Because of this, your code can break in various ways when used in other projects or after refactors.
-#     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
-
-#     #--------------------------
-#     # generateINandTARGETOUT can be different for each model
-#     # inputs and target outputs for RNN
-#     np.random.seed(random_seed); torch.manual_seed(random_seed)# set random seed for reproducible results
-#     model_info_dictionary = np.load(f'{data_dir}/model_info_dictionary.npy', allow_pickle='TRUE').item()
-#     model_class = model_info_dictionary['model_class']
-#     task_name_model = model_info_dictionary['task_name']
-#     n_input = model_info_dictionary['n_input']
-#     n_recurrent = model_info_dictionary['n_recurrent']
-#     n_output = model_info_dictionary['n_output']
-    
-#     if task_name_model[0:12]=='Sussillo2015':# this assumes task_name_model starts with the phrase Sussillo2015
-#         toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
-#         OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
-#         task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG} 
-#     #--------------------------
-#     activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
-#     #--------------------------
-#     IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
-#     TARGETOUT = TARGETOUT.detach().numpy(); output_mask = output_mask.detach().numpy();
-#     # IN:        (n_trials_test, n_T_test, n_input) tensor
-#     # TARGETOUT: (n_trials_test, n_T_test, n_output) tensor
-#     #--------------------------
-
-#     for ip, p in enumerate(pset):
-#         #activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
-#         checkpoint = torch.load(data_dir + f'/model_parameter_update{p}.pth'); model.load_state_dict(checkpoint['model_state_dict']); 
-#         model_input_forwardpass = {'input':IN, 'activity_noise':activity_noise}
-#         model_output_forwardpass = model(model_input_forwardpass)
-#         output = model_output_forwardpass['output']; activity = model_output_forwardpass['activity']
-#         output = output.detach().numpy(); activity = activity.detach().numpy()
-#         # output:   (n_trials_test, n_T_test, n_output) tensor
-#         # activity: (n_trials_test, n_T_test, n_recurrent) tensor
-        
-#         if (p >= 100) and ((ip%10)==0): 
-#             plt.figure()
-#             plt.pcolor(np.mean(activity[:,150:],axis=1), vmin=0.0, vmax=1.0)
-#             plt.xlabel('Neuron #')
-#             plt.ylabel('Condition')
-#             plt.title('Average activity across last few dt, train step:' + str(p))
-#             plt.colorbar() 
-            
-#             # plt.figure()
-#             # for cond in range(output.shape[0]): 
-#             #     plt.plot(TARGETOUT[cond], '-')
-#             #     plt.plot(output[cond],'--')
         
 
 #%%###########################################################################
@@ -941,6 +938,10 @@ if plotPCA:
             toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
             OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
             task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
+        if task_name_model[0:15]=='Hatsopoulos2007':# this assumes task_name_model starts with the phrase Hatsopoulos2007
+            toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps output is offset, no change if toffsetoutput=0, if toffsetoutput is negative then target outuput is earlier in the trial
+            OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTSHOULDERELBOWANGLES=model_info_dictionary['OUTPUTSHOULDERELBOWANGLES']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+            task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
         #--------------------------
         activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
         #--------------------------
@@ -1031,6 +1032,10 @@ else:
             toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
             OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
             task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
+        if task_name_model[0:15]=='Hatsopoulos2007':# this assumes task_name_model starts with the phrase Hatsopoulos2007
+            toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps output is offset, no change if toffsetoutput=0, if toffsetoutput is negative then target outuput is earlier in the trial
+            OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTSHOULDERELBOWANGLES=model_info_dictionary['OUTPUTSHOULDERELBOWANGLES']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+            task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
         #--------------------------
         if dataset_name != 'Mante13':
             IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
@@ -1077,209 +1082,6 @@ else:
     np.save(f'{figure_dir}/distance_neuraltoneuralsubsampled_between0and1.npy', distance_neuraltoneuralsubsampled_between0and1)
     np.save(f'{figure_dir}/distance_modeltoneuralsubsampled_between0and1.npy', distance_modeltoneuralsubsampled_between0and1)
     np.save(f'{figure_dir}/distance_crossconditionaverageneuraltoneuralsubsampled_between0and1.npy', distance_crossconditionaverageneuraltoneuralsubsampled_between0and1)
-'''
-for iteration in range(2):# scatterplot showing model/neural and neural/neural distances
-    #PLOTBASELINE = 1# if 1 plot cross condition average baseline
-    if iteration==0: PLOTLEGEND = 1# if 1 plot legend
-    if iteration==1: PLOTLEGEND = 0# if 1 plot legend
-    similaritynametoplot = similarityname + 'between0and1' + f'on{n_sample_for_distance_normalizedwithdata}neurons'; figure_suffix = pbestname + '_train' + '_crossconditionaveragebaseline' + '_noisefloor'; yplot_baseline = np.mean(distance_crossconditionaverageneuraltoneuralsubsampled_between0and1)
-    fontsize = 10 
-    fig, ax = plt.subplots()
-    for imodel in range(n_models):
-        iposition = np.flatnonzero(desiredorder == imodel)[0]# model imodel is plotted at position iposition
-        ax.plot(iposition*np.ones(n_iterations), distance_neuraltoneuralsubsampled_between0and1[:,imodel], '.', markersize=5, color='k', label='neural to neural distance'if imodel == 0 else "")
-        ax.plot(iposition*np.ones(n_iterations), distance_modeltoneuralsubsampled_between0and1[:,imodel], '.', markersize=5, color=eval(f"color{imodel}"), label=eval(f"legend_label{imodel}"))   
-    ax.plot([0-0.5, n_models-0.5], [yplot_baseline, yplot_baseline], "k--", linewidth=1);# figure_suffix = figure_suffix + '_crossconditionaveragebaseline'; # horizontal line indicating the cross condition average baseline
-    plt.xticks(rotation = 45) # Rotates X-Axis Ticks by 45-degrees
-    ax.set_xticks(xplot); 
-    ax.set_xticklabels(xtick_label_desiredorder, rotation = 45, ha="right", fontsize=1)
-    ax.set_ylabel(f'{similaritynametoplot}\ntrain distance scaled between 0 and 1', fontsize=fontsize)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.tick_params(axis='x', which='both', length=0)
-    if PLOTLEGEND==1: ax.legend(frameon=True, framealpha=1, loc='lower right')
-    if PLOTLEGEND==0: figure_suffix = figure_suffix + '_nolegend'
-    if VARIANCEEXPLAINED_KEEP is not None:                        fig.savefig('%s/main_scatterplot%s_nTkeep%g_variance%g_%s.pdf'%(figure_dir,similaritynametoplot,n_Tkeep,VARIANCEEXPLAINED_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if n_PCs_KEEP is not None:                                    fig.savefig('%s/main_scatterplot%s_nTkeep%g_%gPCs_%s.pdf'%(figure_dir,similaritynametoplot,n_Tkeep,n_PCs_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if (VARIANCEEXPLAINED_KEEP is None) and (n_PCs_KEEP is None): fig.savefig('%s/main_scatterplot%s_nTkeep%g_noPCA_%s.pdf'%(figure_dir,similaritynametoplot,n_Tkeep,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-#import sys; sys.exit()# stop script at current line    
-''' 
-
-'''
-#%%###########################################################################
-#    vary interval2set and see if this improves model/data similarity
-##############################################################################
-#imodel_set = np.array([21, 62, 66, 68, 76, 38, 39]); interval2set_new = 62 + np.arange(-10, 6)# interval after the input specifying the condition and before the hold-cue turns off
-imodel_set = np.array([0, n_models-1]); interval2set_new = interval2set + np.arange(-20, 20)# interval after the input specifying the condition and before the hold-cue turns off
-imodel_set = i5best_models_train; interval2set_new = interval2set + np.arange(-20, 21)# interval after the input specifying the condition and before the hold-cue turns off
-
-distance_train = -700*np.ones((imodel_set.size, interval2set_new.size))
-distance_test = -700*np.ones((imodel_set.size, interval2set_new.size))
-for ii, imodel in enumerate(imodel_set):
-    for jj in range(interval2set_new.size):
-        data_dir = eval(f"data_dir{imodel}")# use eval so data_dir is the value of data_dir0 and not the string 'data_dir0'
-        model = torch.load(f'{data_dir}/model.pth')# torch.save(model, f'{figure_dir}/model.pth')# save entire model, not just model parameters
-        model_info_dictionary = np.load(f'{data_dir}/model_info_dictionary.npy', allow_pickle='TRUE').item()
-        n_input = model_info_dictionary['n_input']
-        n_output = model_info_dictionary['n_output']
-        n_recurrent = model_info_dictionary['n_recurrent']
-        model_class = model_info_dictionary['model_class']# model name for forward pass
-        task_name_model = model_info_dictionary['task_name']   
-            
-        #--------------------------
-        # generateINandTARGETOUT can be different for each model
-        # inputs and target outputs for RNN
-        if task_name_model[0:12]=='Sussillo2015':# this assumes task_name_model starts with the phrase Sussillo2015
-            toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
-            OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
-            task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set_new[jj][None], 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
-        #--------------------------
-        IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
-        TARGETOUT = TARGETOUT.detach().numpy(); output_mask = output_mask.detach().numpy()
-        # IN:        (n_trials_test, n_T_test, n_input) tensor
-        # TARGETOUT: (n_trials_test, n_T_test, n_output) tensor
-        #--------------------------
-        p = pbest[imodel]# choose RNN parameters to load
-        #p = 0# initial parameters for model before training
-        checkpoint = torch.load(data_dir + f'/model_parameter_update{p}.pth'); model.load_state_dict(checkpoint['model_state_dict']); 
-        activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
-        model_input_forwardpass = {'input':IN, 'activity_noise':activity_noise}
-        model_output_forwardpass = model(model_input_forwardpass)
-        output = model_output_forwardpass['output']; activity = model_output_forwardpass['activity']
-        output = output.detach().numpy(); activity = activity.detach().numpy()
-        # output:   (n_trials_test, n_T_test, n_output) tensor
-        # activity: (n_trials_test, n_T_test, n_recurrent) tensor
-        X_neuraldata = neuralforRNN[:,itimekeep_neural,:].copy()# neuralforRNN: n_neurons(161) x n_Tneural(196) x n_reachconditions(27) array, time [-1550:10:400] ms relative to movement onset
-        Y = np.transpose(activity[:,itimekeep_RNN,:].copy(), axes=[2, 1, 0])# n_recurrent x n_Tkeep x n_trials_test, permute dimensions of array
-        
-        distance_train_, distance_test_ = computedistance_crossconditionvalidation(X_neuraldata, Y, VARIANCEEXPLAINED_KEEP, n_PCs_KEEP, similarityname, NORMALIZE_BETWEEN0AND1)# (n_conditions,) arrays, model/data distance across n_conditions iterations of cross-validation
-        distance_train[ii,jj] = np.mean(distance_train_)
-        distance_test[ii,jj] = np.mean(distance_test_)
-  
-for iteration in range(2):
-    PLOTBASELINE = 0# if 1 plot cross condition average baseline
-    PLOTLEGEND = 1# if 1 plot legend
-    if iteration==0: distance_plot = distance_train; figure_suffix = pbestname + '_train'; ylabel = 'train';
-    if iteration==1: distance_plot = distance_test; figure_suffix = pbestname + '_test'; ylabel = 'test';
-            
-    fig, ax = plt.subplots()# model/data distance versus interval2 (interval after the input specifying the condition and before the hold-cue turns off)
-    fontsize = 8
-    yplot_baseline = yplot_train_cross_condition_average_baseline
-    for ii, imodel in enumerate(imodel_set):
-        min = np.min(distance_plot[ii,:])
-        indices = distance_plot[ii,:] == min# (n_iterations,) array of bool, indices where both conditions are true
-        indices = np.arange(indices.size)[indices==True]# indices where condition is True
-        imin = indices[0]
-        ax.plot(interval2set_new, distance_plot[ii,:], '-', color=eval(f"color{imodel}"), linewidth=2, label=f'model{imodel}, min={min:.4g} when interval2={interval2set_new[imin]}')# label=eval(f"legend_label{imodel}")
-        ax.plot(interval2set_new[imin], distance_plot[ii,imin], '.', color=eval(f"color{imodel}"), markersize=20)
-    if PLOTBASELINE: xmin, xmax = ax.get_xlim(); ax.plot([xmin, xmax], [yplot_baseline, yplot_baseline], "k--", linewidth=1)# horizontal line indicating the cross condition average baseline
-    if PLOTLEGEND: ax.legend(frameon=True, framealpha=1, fontsize=fontsize, loc='best'); figure_suffix = figure_suffix + '_legend'
-    ax.set_xlabel('interval2\ninterval after the input specifying the condition and before the hold-cue turns off', fontsize=fontsize)
-    ax.set_ylabel(f'{similarityname} {ylabel} distance across {n_conditions} conditions', fontsize=fontsize)
-    ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False);# ax.spines['bottom'].set_visible(False); ax.spines['left'].set_visible(False)
-    ax.grid(axis='both', color='0.95')
-    if VARIANCEEXPLAINED_KEEP is not None: ax.set_title(f'{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname}, keep {100*VARIANCEEXPLAINED_KEEP}% variance', fontsize=fontsize)
-    if n_PCs_KEEP is not None:             ax.set_title(f'{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname}, keep {n_PCs_KEEP} PCs', fontsize=fontsize)
-    if (VARIANCEEXPLAINED_KEEP is None) and (n_PCs_KEEP is None): ax.set_title(f'{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname} (no PCA)', fontsize=fontsize)
-    ax.tick_params(axis='both', labelsize=fontsize)
-    if VARIANCEEXPLAINED_KEEP is not None:                        fig.savefig('%s/models_%svsinterval2_nTkeep%g_variance%g_%s.pdf'%(figure_dir,similarityname,n_Tkeep,VARIANCEEXPLAINED_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if n_PCs_KEEP is not None:                                    fig.savefig('%s/models_%svsinterval2_nTkeep%g_%gPCs_%s.pdf'%(figure_dir,similarityname,n_Tkeep,n_PCs_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if (VARIANCEEXPLAINED_KEEP is None) and (n_PCs_KEEP is None): fig.savefig('%s/models_%svsinterval2_nTkeep%g_noPCA_%s.pdf'%(figure_dir,similarityname,n_Tkeep,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-
-
-#%%###########################################################################
-#    vary interval1set and interval2set and see if this improves model/data similarity
-##############################################################################
-imodel = i5best_models_train[0]
-interval1set_new = interval1set + np.arange(-15, 16)# interval before input specifying the reach condition, if interval1 is 0 then tstartcondition is at the very beginning of the trial (index 0)
-interval2set_new = interval2set + np.arange(-15, 16)# interval after the input specifying the condition and before the hold-cue turns off
-#interval1set_new = interval1set + np.arange(-25, 26)# interval before input specifying the reach condition, if interval1 is 0 then tstartcondition is at the very beginning of the trial (index 0)
-#interval2set_new = interval2set + np.arange(-25, 26)# interval after the input specifying the condition and before the hold-cue turns off
-interval1set_new = np.delete(interval1set_new, interval1set_new<0)# remove negative indices, interval1set >= 0
-
-
-distance_train = -700*np.ones((interval1set_new.size, interval2set_new.size))
-distance_test = -700*np.ones((interval1set_new.size, interval2set_new.size))
-for ii in range(interval1set_new.size):
-    for jj in range(interval2set_new.size):
-        data_dir = eval(f"data_dir{imodel}")# use eval so data_dir is the value of data_dir0 and not the string 'data_dir0'
-        model = torch.load(f'{data_dir}/model.pth')# torch.save(model, f'{figure_dir}/model.pth')# save entire model, not just model parameters
-        model_info_dictionary = np.load(f'{data_dir}/model_info_dictionary.npy', allow_pickle='TRUE').item()
-        n_input = model_info_dictionary['n_input']
-        n_output = model_info_dictionary['n_output']
-        n_recurrent = model_info_dictionary['n_recurrent']
-        model_class = model_info_dictionary['model_class']# model name for forward pass
-        task_name_model = model_info_dictionary['task_name']   
-            
-        #--------------------------
-        # generateINandTARGETOUT can be different for each model
-        # inputs and target outputs for RNN
-        if task_name_model[0:12]=='Sussillo2015':# this assumes task_name_model starts with the phrase Sussillo2015
-            toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
-            OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
-            task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set_new[ii][None], 'interval2set':interval2set_new[jj][None], 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
-        #--------------------------
-        IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
-        TARGETOUT = TARGETOUT.detach().numpy(); output_mask = output_mask.detach().numpy()
-        # IN:        (n_trials_test, n_T_test, n_input) tensor
-        # TARGETOUT: (n_trials_test, n_T_test, n_output) tensor
-        #--------------------------
-        
-        p = pbest[imodel]# choose RNN parameters to load
-        #p = 0# initial parameters for model before training
-        checkpoint = torch.load(data_dir + f'/model_parameter_update{p}.pth'); model.load_state_dict(checkpoint['model_state_dict']); 
-        activity_noise = 0*torch.randn(n_trials_test, n_T_test, n_recurrent)# (n_trials, n_T, n_recurrent) tensor
-        model_input_forwardpass = {'input':IN, 'activity_noise':activity_noise}
-        model_output_forwardpass = model(model_input_forwardpass)
-        output = model_output_forwardpass['output']; activity = model_output_forwardpass['activity']
-        output = output.detach().numpy(); activity = activity.detach().numpy()
-        # output:   (n_trials_test, n_T_test, n_output) tensor
-        # activity: (n_trials_test, n_T_test, n_recurrent) tensor
-        X_neuraldata = neuralforRNN[:,itimekeep_neural,:].copy()# neuralforRNN: n_neurons(161) x n_Tneural(196) x n_reachconditions(27) array, time [-1550:10:400] ms relative to movement onset
-        Y = np.transpose(activity[:,itimekeep_RNN,:].copy(), axes=[2, 1, 0])# n_recurrent x n_Tkeep x n_trials_test, permute dimensions of array
-        
-        distance_train_, distance_test_ = computedistance_crossconditionvalidation(X_neuraldata, Y, VARIANCEEXPLAINED_KEEP, n_PCs_KEEP, similarityname, NORMALIZE_BETWEEN0AND1)# (n_conditions,) arrays, model/data distance across n_conditions iterations of cross-validation
-        distance_train[ii,jj] = np.mean(distance_train_)
-        distance_test[ii,jj] = np.mean(distance_test_)
-    print(f"interval1set_new {ii+1}/{interval1set_new.size}")
-
-
-for iteration in range(2):
-    if iteration==0: data = distance_train; figure_suffix = pbestname + '_train'; ylabel = 'train';
-    if iteration==1: data = distance_test; figure_suffix = pbestname + '_test'; ylabel = 'test';
-        
-    imin = np.where(data == np.min(data))
-    
-    fig, ax = plt.subplots()# model/data distance versus interval1 and interval2 
-    fontsize = 5
-    colormap = 'viridis'
-    #colormap = cm.get_cmap('cet_gouldian')# The colorcet colormaps are all available through matplotlip.cm.get_cmap by prepending cet_to the colormap name. https://colorcet.holoviz.org/user_guide/index.html
-    im = ax.imshow(data, cmap=colormap,  origin='upper')# use colorcet for perceptually uniform colormaps https://colorcet.holoviz.org/getting_started/index.html
-    # create an axes on the right side of ax. The width of cax will be 5% of ax and the padding between cax and ax will be fixed at 0.05 inch. https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label(similarityname + f' {ylabel} distance', size=fontsize); cbar.ax.tick_params(labelsize=fontsize) 
-    ax.set_xlabel('interval2\ninterval after the input specifying the condition and before the hold-cue turns off', fontsize=fontsize)
-    ax.set_ylabel('interval1\ninterval before input specifying the condition', fontsize=fontsize)
-    ax.set_xticks(np.arange(0,data.shape[1])); ax.set_xticklabels(interval2set_new)
-    ax.set_yticks(np.arange(0,data.shape[0])); ax.set_yticklabels(interval1set_new)
-    if VARIANCEEXPLAINED_KEEP is not None: ax.set_title(f'model{imodel}, min={np.min(data):.4g} when interval1={interval1set_new[imin[0][0]]}, interval2={interval2set_new[imin[1][0]]}\n{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname}, keep {100*VARIANCEEXPLAINED_KEEP}% variance', fontsize=fontsize)
-    if n_PCs_KEEP is not None:             ax.set_title(f'model{imodel}, min={np.min(data):.4g} when interval1={interval1set_new[imin[0][0]]}, interval2={interval2set_new[imin[1][0]]}\n{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname}, keep {n_PCs_KEEP} PCs', fontsize=fontsize)
-    if (VARIANCEEXPLAINED_KEEP is None) and (n_PCs_KEEP is None): ax.set_title(f'model{imodel}, min={np.min(data):.4g} when interval1={interval1set_new[imin[0][0]]}, interval2={interval2set_new[imin[1][0]]}\n{n_conditions} conditions, {n_Tkeep} timesteps for {similarityname} (no PCA)', fontsize=fontsize)
-    #ax.tick_params(axis='both', labelsize=fontsize)
-    ax.tick_params(axis='both', labelsize=2)
-    if VARIANCEEXPLAINED_KEEP is not None:                        fig.savefig('%s/models_%svsinterval1and2_nTkeep%g_variance%g_%s.pdf'%(figure_dir,similarityname,n_Tkeep,VARIANCEEXPLAINED_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if n_PCs_KEEP is not None:                                    fig.savefig('%s/models_%svsinterval1and2_nTkeep%g_%gPCs_%s.pdf'%(figure_dir,similarityname,n_Tkeep,n_PCs_KEEP,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-    if (VARIANCEEXPLAINED_KEEP is None) and (n_PCs_KEEP is None): fig.savefig('%s/models_%svsinterval1and2_nTkeep%g_noPCA_%s.pdf'%(figure_dir,similarityname,n_Tkeep,figure_suffix), bbox_inches='tight')# add bbox_inches='tight' to keep title from being cutoff
-'''
-
-
-
-
-
 
 #%%###########################################################################
 #                             Figures
@@ -1511,7 +1313,11 @@ if task_name_model[0:12]=='Sussillo2015':# this assumes task_name_model starts w
     toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
     OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
     task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
-
+if task_name_model[0:15]=='Hatsopoulos2007':# this assumes task_name_model starts with the phrase Hatsopoulos2007
+    toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps output is offset, no change if toffsetoutput=0, if toffsetoutput is negative then target outuput is earlier in the trial
+    OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTSHOULDERELBOWANGLES=model_info_dictionary['OUTPUTSHOULDERELBOWANGLES']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+    task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
+if dataset_name != 'Mante13':
     IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
     TARGETOUT = TARGETOUT.detach().numpy(); output_mask = output_mask.detach().numpy();
 # IN:        (n_trials_test, n_T_test, n_input) tensor
@@ -1535,7 +1341,11 @@ for imodel in range(n_models):
         toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps EMG output is offset, no change if toffsetEMG=0, if toffsetEMG is negative then target EMG outuput is earlier in the trial
         OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTEMG=model_info_dictionary['OUTPUTEMG']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTEMG
         task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTEMG':OUTPUTEMG}
-        
+    if task_name_model[0:15]=='Hatsopoulos2007':# this assumes task_name_model starts with the phrase Hatsopoulos2007
+        toffsetoutput = model_info_dictionary['toffsetoutput']# number of timesteps output is offset, no change if toffsetoutput=0, if toffsetoutput is negative then target outuput is earlier in the trial
+        OUTPUTONEHOT=model_info_dictionary['OUTPUTONEHOT']; OUTPUTXYHANDPOSITION=model_info_dictionary['OUTPUTXYHANDPOSITION']; OUTPUTXYHANDVELOCITY=model_info_dictionary['OUTPUTXYHANDVELOCITY']; OUTPUTSHOULDERELBOWANGLES=model_info_dictionary['OUTPUTSHOULDERELBOWANGLES']# OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1, in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
+        task_input_dict = {'task_name':task_name_model, 'n_input':n_input, 'n_output':n_output, 'n_T':n_T_test, 'n_trials':n_trials_test, 'interval1set':interval1set, 'interval2set':interval2set, 'toffsetoutput':toffsetoutput, 'OUTPUTONEHOT':OUTPUTONEHOT, 'OUTPUTXYHANDPOSITION':OUTPUTXYHANDPOSITION, 'OUTPUTXYHANDVELOCITY':OUTPUTXYHANDVELOCITY, 'OUTPUTSHOULDERELBOWANGLES':OUTPUTSHOULDERELBOWANGLES}
+    if dataset_name != 'Mante13':
         IN, TARGETOUT, output_mask, task_output_dict = generateINandTARGETOUT(task_input_dict)
         TARGETOUT = TARGETOUT.detach().numpy(); output_mask = output_mask.detach().numpy();
     # IN:        (n_trials_test, n_T_test, n_input) tensor
