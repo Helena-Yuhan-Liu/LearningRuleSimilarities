@@ -100,9 +100,6 @@ def generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue(task_input_di
     OUTPUTXYHANDPOSITION = task_input_dict['OUTPUTXYHANDPOSITION']
     OUTPUTXYHANDVELOCITY = task_input_dict['OUTPUTXYHANDVELOCITY']
     OUTPUTSHOULDERELBOWANGLES = task_input_dict['OUTPUTSHOULDERELBOWANGLES']
-    TEACHER_STUDENT_TRAINING = 0# 0(False) or 1(True), default is 0 
-    if ('TEACHER_STUDENT_TRAINING' in task_input_dict):
-        TEACHER_STUDENT_TRAINING = task_input_dict['TEACHER_STUDENT_TRAINING']
         
     #assert np.sum(INPUT_ONE_HOT + INPUT_SINE_COSINE) == 1, "Error: one, and only one, input type must be selected"
     #if INPUT_ONE_HOT: assert n_input==9, "Error: 8 one-hot inputs encode the reach condition + 1 input for the hold-cue"
@@ -110,13 +107,12 @@ def generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue(task_input_di
     
     # OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES can all be 1
     # in this case the target output is a concatenation of each output in the order OUTPUTONEHOT, OUTPUTXYHANDPOSITION, OUTPUTXYHANDVELOCITY, OUTPUTSHOULDERELBOWANGLES
-    if TEACHER_STUDENT_TRAINING==0:
-        n_output_check = 0
-        if OUTPUTONEHOT==1: n_output_check = n_output_check + 8# one-hot output for each reach condition
-        if OUTPUTXYHANDPOSITION==1: n_output_check = n_output_check + 2
-        if OUTPUTXYHANDVELOCITY==1: n_output_check = n_output_check + 2
-        if OUTPUTSHOULDERELBOWANGLES==1: n_output_check = n_output_check + 2# output shoulder and elbow angle
-        assert n_output==n_output_check, "Error: n_output is not correct."
+    n_output_check = 0
+    if OUTPUTONEHOT==1: n_output_check = n_output_check + 8# one-hot output for each reach condition
+    if OUTPUTXYHANDPOSITION==1: n_output_check = n_output_check + 2
+    if OUTPUTXYHANDVELOCITY==1: n_output_check = n_output_check + 2
+    if OUTPUTSHOULDERELBOWANGLES==1: n_output_check = n_output_check + 2# output shoulder and elbow angle
+    assert n_output==n_output_check, "Error: n_output is not correct."
         
     IN = np.zeros((n_trials,n_T,n_input))
     TARGETOUT = np.zeros((n_trials,n_T,n_output))
@@ -207,22 +203,6 @@ def generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue(task_input_di
     #IN = torch.from_numpy(IN, dtype=dtype); TARGETOUT = torch.from_numpy(TARGETOUT, dtype=dtype); output_mask = torch.from_numpy(output_mask, dtype=dtype); TARGETOUT_icondition = torch.from_numpy(TARGETOUT_icondition, dtype=dtype);
     IN = torch.tensor(IN, dtype=dtype); TARGETOUT = torch.tensor(TARGETOUT, dtype=dtype); output_mask = torch.tensor(output_mask, dtype=dtype); TARGETOUT_icondition = torch.tensor(TARGETOUT_icondition, dtype=dtype);
     #--------------------------------------------------------------------------
-    if TEACHER_STUDENT_TRAINING==1:
-        output_mask = torch.ones(n_trials,n_T,n_output, dtype=torch.float32)# all timepoints are included in loss function
-        # 1. load parameters from previously trained model to serve as a teacher during training
-        dir_parameters_teacher = task_input_dict['dir_parameters_teacher']
-        n_parameter_updates_loadteacher = task_input_dict['n_parameter_updates_loadteacher']
-        model_teacher = torch.load(f'{dir_parameters_teacher}/model.pth')# torch.save(model, f'{figdir}/model.pth')# save entire model, not just model parameters
-        p = n_parameter_updates_loadteacher# choose RNN parameters to load
-        checkpoint = torch.load(dir_parameters_teacher + f'/model_parameter_update{p}.pth'); model_teacher.load_state_dict(checkpoint['model_state_dict']); 
-        
-        # 2. change loss function, the goal is for each unit in the student model to match the firing rate of each unit in the teacher model, this only works if the teacher and student models have the same number of units
-        activity_noise = task_input_dict['activity_noise']
-        model_input_forwardpass_teacher = {'input':IN, 'activity_noise':activity_noise}
-        model_output_forwardpass_teacher = model_teacher(model_input_forwardpass_teacher)# model_input_forwardpass = {'input':IN, 'activity_noise':activity_noise}
-        activity_teacher = model_output_forwardpass_teacher['activity']# (n_trials, n_T, n_recurrent)
-        TARGETOUT = torch.tensor(activity_teacher.detach().numpy(), dtype=torch.float32)# get rid of graph and don't backprop through teacher. probably can do this more efficiently
-    #--------------------------------------------------------------------------    
     task_output_dict = {'n_input':n_input, 'n_output':n_output, 'n_T':n_T, 'n_trials':n_trials, 'TARGETOUT_icondition':TARGETOUT_icondition, 'istartcondition':istartcondition, 'iendcondition':iendcondition, 'istartoutput':istartoutput, 'iendoutput':iendoutput}
     return IN, TARGETOUT, output_mask, task_output_dict
 

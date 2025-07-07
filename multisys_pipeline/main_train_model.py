@@ -14,8 +14,7 @@ import pickle
 #import sys; sys.exit()# stop script at current line
 
 #import testpipeline
-from multisys_pipeline.models.model_architectures import CTRNN, effective_weight, get_Wab # relative import, from file import function
-# from multisys_pipeline.models.model_architectures import LowPassCTRNN 
+from multisys_pipeline.models.model_architectures import CTRNN # relative import, from file import function
 from multisys_pipeline.utils.compute_normalized_error import compute_normalized_error
 # from multisys_pipeline.models.generateINandTARGETOUT_Sussillo2015_EMG import generateINandTARGETOUT_Sussillo2015_EMG
 from multisys_pipeline.models.generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue import generateINandTARGETOUT_Hatsopoulos2007_sincosbumpinput_holdcue
@@ -37,6 +36,8 @@ parser = ArgumentParser()# if type is not specified then by default the parser r
 parser.add_argument('--task_name', default='Mante13', choices=['Mante13', 'Hatsopoulos2007_sincosbumpinput_holdcue'], type=str)# task_name determines which version of generateINandTARGETOUT is used, task_name is also used to name the folder where parameters are stored
 parser.add_argument('--optimizer_name', default='Adam', choices=['Adam', 'AdamW'], help="Options: 'Adam', 'AdamW'", type=str)# optimizer_name determines which optimizer to use when updating the model parameters
 parser.add_argument('--learning_rate', default=3e-4, help='learning rate for Adam optimizer', type=float)# learning_rate = 1e-3 default
+parser.add_argument('--learning_mode', default=0, help='learning rule mode; 0: BPTT, 1:e-prop', type=int)
+##
 parser.add_argument('--CLIP_GRADIENT_NORM', default=0, help='if CLIP_GRADIENT_NORM = 1 then clip the norm of the gradient', type=int)
 parser.add_argument('--max_gradient_norm', default=0.4, help='if CLIP_GRADIENT_NORM = 1 then the norm of the gradient is clipped to have a maximum value of max_gradient_norm', type=float)# this is only used if CLIP_GRADIENT_NORM = 1
 parser.add_argument('--n_parameter_updates', default=1000, help='number of parameter updates', type=int)# set required=True for arguments that are required
@@ -49,7 +50,6 @@ parser.add_argument('--activity_noise_std', default=0.0, help='added noise', typ
 parser.add_argument('--ini_gain', default=1.0, help='initial weight gain', type=float)
 parser.add_argument('--tau_m', default=10.0, help='membrane time constant', type=float)
 parser.add_argument('--conn_density', default=-1, help='sparsity of connection, -1 to turn off', type=float)
-parser.add_argument('--learning_mode', default=1, help='learning rule mode; 0: BPTT, 1:e-prop', type=int)
 parser.add_argument('--dale_constraint', default=False, help='constrain with Dale or not', type=bool)
 parser.add_argument('--random_seed', default=1, help='random seed', type=int)# set required=True for arguments that are required
 #-----------------------------------------------------------------------------
@@ -67,6 +67,9 @@ for key,val in args.items():# https://stackoverflow.com/questions/18090672/conve
     exec(key + '=val')# if we have a dictionary with keys that are all strings, unpack these keys into local variables with the corresponding values. example: keyname = dictionary["keyname"]
 
 #import sys; sys.exit()# stop script at current line
+
+if dale_constraint or (conn_density != -1):
+    print('Warning: the weight eigenspectrum plot does not account for sparsity or sign constrained weights') 
 
 # comment out if don't want to fix seed 
 set_seed = True
@@ -204,18 +207,7 @@ LEARN_OUTPUTBIAS = True
 #LEARN_OUTPUTWEIGHT = False; LEARN_OUTPUTBIAS = False; np.random.seed(args["random_seed"]+2); torch.manual_seed(args["random_seed"]+2); Wyh = torch.randn(n_output,n_recurrent) / np.sqrt(n_recurrent); by = torch.zeros(n_output)
 if args["model_class"]=='CTRNN':
     tau_m_ = tau_m 
-    # if False: 
-    #     part1 = np.random.uniform(5, 15, int(n_recurrent/2))         # Half of the elements between 5 and 15
-    #     part2 = np.random.uniform(1, 5, int(n_recurrent/4))       # 1/4 of the elements between 1 and 3
-    #     part3 = np.random.uniform(15, 40, int(n_recurrent/4))     # 1/4 of the elements between 20 and 50
-    #     tau_array = np.concatenate([part1, part2, part3])
-    #     np.random.shuffle(tau_array)
-    #     tau_m_ = tau_array 
     model = CTRNN(n_input, n_recurrent, n_output, activation_function=activation_function, ah0=ah0, LEARN_ah0=True, Wahx=Wahx, Wahh=Wahh, Wyh=Wyh, bah=bah, by=by, LEARN_OUTPUTWEIGHT=LEARN_OUTPUTWEIGHT, LEARN_OUTPUTBIAS=LEARN_OUTPUTBIAS, gain_Wh2h=ini_gain, learning_mode=learning_mode, dale_constraint=dale_constraint, Tau=tau_m_, conn_density=conn_density); model_class = 'CTRNN'; 
-# if args["model_class"]=='LowPassCTRNN':
-#     model = LowPassCTRNN(n_input, n_recurrent, n_output, Wrx=Wahx, Wrr=Wahh, Wyr=Wyh, br=bah, by=by, activation_function=activation_function, r0=ah0, LEARN_r0=True, LEARN_OUTPUTWEIGHT=LEARN_OUTPUTWEIGHT, LEARN_OUTPUTBIAS=LEARN_OUTPUTBIAS); model_class = 'LowPassCTRNN'
-     
-
 
 #---------------check number of learned parameters---------------
 n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)# model.parameters include those defined in __init__ even if they are not used in forward pass
@@ -450,10 +442,6 @@ for p in range(n_parameter_updates+1):# 0, 1, 2, ... n_parameter_updates
     assert np.allclose(gradient.size,model.n_parameters), "size of gradient and number of learned parameters don't match!"
     gradient_norm[p] = np.sqrt(np.sum(gradient**2))
     #print(f'{p} parameter updates: gradient norm = {gradient_norm[p]:.4g}')
-    
-    # update Wab, assume ModProp run when both are true 
-    if (activation_function == 'ReLU' and dale_constraint):
-        model.Wab = get_Wab(effective_weight(model.fc_h2ah.weight, model.mask), model.tp_idx)
 
         
 #import sys; sys.exit()# stop script at current line    

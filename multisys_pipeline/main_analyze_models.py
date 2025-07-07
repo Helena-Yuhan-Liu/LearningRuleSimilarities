@@ -53,15 +53,13 @@ import argparse
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--dataset_name', default='Mante13', choices=['Mante13', 'Hatsopoulos2007'], type=str)
 parser.add_argument('--anal_mode', default='compLM', type=str, help='compLR = compare different learning rates')
-parser.add_argument('--load_stored_dist', default=False, type=bool, help='load stored distance if it exists')
 args = parser.parse_args()
 
 comment = '' 
 
-LOAD_STORED_DIST = args.load_stored_dist # if stored dist exists for the given folder name, simply load it
-
 VERBOSE = False 
 plotPCA = False 
+LOAD_STORED_DIST = False
 
 anal_mode = args.anal_mode  
 dataset_name = args.dataset_name 
